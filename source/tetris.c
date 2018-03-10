@@ -12,8 +12,11 @@
 #define TETROMINO_SIZE  36
 #define NEXT_COUNT      3
 
-#define GRID_XOFFSET    360
+#define GRID_XOFFSET    260
 #define GRID_YOFFSET    0
+
+#define TEXT_COLOR      RGBA8_MAXALPHA(255,255,255)
+#define BG_COLOR        RGBA8_MAXALPHA(0,0,0x4F)
 
 #define DEFAULT_TICKS   50
 #define LEVEL_TICKS     (DEFAULT_TICKS - (5 * level))
@@ -43,17 +46,22 @@ typedef struct {
     s8 y;
 } Pair;
 
-static u8 tetrisgrid[10][22];
-static u32 gridcolor;
-static int lines;
-static int score;
-static int highscore;
-static int level;
+static u8 tetrisgrid[22][10];
+static u8 linefull[22];
+static u32 gridcolor = 0xFFC0C0C0;
+static u32 lines;
+static u32 score;
+static u32 highscore;
+static u8 level;
 static int gravityticks;
 static int glueticks;
 static int lineclearticks;
+static u8 pause;
+static u8 gameover;
+static u8 didswap;
+static u8 softdrop;
 static Tetromino current;
-static Tetromino onhold;
+static Tetromino onhold = { 0, 3, 0, 0, 1 };
 static Tetromino ghost;
 static u8 currentbag[] = { 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6 };
 static u8 currentbagpos;
@@ -126,6 +134,10 @@ static const TetrominoData tetrodata[7] = {
     }
 };
 
+static const int scoretable[] = {
+    0, 100, 300, 500, 800
+};
+
 static int checkCollision(Tetromino* t, s8 x, s8 y) {
     u32 i, j, w, h, r;
     w = tetrodata[t->type].width;
@@ -134,13 +146,40 @@ static int checkCollision(Tetromino* t, s8 x, s8 y) {
     for (i = 0; i < w; ++i) {
         for (j = 0; j < h; ++j) {
             if  (tetrodata[t->type].blockdata[j * w * 4 + r + i] &&
-                ((x + i < 0) || (x + i >= 10) || (y + j >= 22) || tetrisgrid[x + i][y + j])
+                ((x + i < 0) || (x + i >= 10) || (y + j >= 22) || tetrisgrid[y + j][x + i])
             ) {
                 return 1;
             }
         }
     }
     return 0;
+}
+
+static int checkLines(u8 start, u8 end) {
+    u8 i, j, ln = 0;
+    printf("%u %u\n", start, end);
+    for (j = start; j < end && j < 22; ++j) {
+        for (i = 0; i < 10; ++i) {
+            if (!tetrisgrid[j][i]) break;
+        }
+        if (i == 10) {
+            ++ln;
+            linefull[j] = 1;
+        }
+    }
+    return ln;
+}
+
+static void addScore(int value) {
+    score += value;
+    if (score > highscore) {
+        highscore = score;
+    }
+}
+
+static void doGameOver() {
+    pause = gameover = 1;
+    // TODO: save highscore
 }
 
 static void generateBag(u8* bag) {
@@ -173,10 +212,31 @@ static void nextTetromino() {
     current.y = 0;
     current.rot = current.ghost = 0;
     if (checkCollision(&current, current.x, current.y)) {
-        //doGameOver();
+        doGameOver();
     } else {
         generateGhost(&current);
     }
+    didswap = 0;
+}
+
+static void clearLines() {
+    u8 i, j, k;
+    for (j = 0; j < 22; ++j) {
+        // If the line is full
+        if (linefull[j]) {
+            // Move everything down one level
+            for (i = j; i > 0; --i) {
+                memcpy(&tetrisgrid[i][0], &tetrisgrid[i-1][0], sizeof(tetrisgrid[i]));
+            }
+            // Clear the top row
+            for (k = 0; k < 10; ++k) {
+                tetrisgrid[i][k] = 0;
+            }
+            linefull[j] = 0;
+        }
+    }
+    level = ((lines / 10) + 1);
+    nextTetromino();
 }
 
 static void doGlue() {
@@ -184,24 +244,32 @@ static void doGlue() {
     w = tetrodata[current.type].width;
     h = tetrodata[current.type].height;
     r = current.rot * w;
-    for (i = 0; i < w; ++i) {
-        for (j = 0; j < h; ++j) {
+    for (j = 0; j < h; ++j) {
+        for (i = 0; i < w; ++i) {
             u32 offs = j * w * 4 + r + i;
             if (tetrodata[current.type].blockdata[offs]) {
-                tetrisgrid[current.x + i][current.y + j] = tetrodata[current.type].blockdata[offs];
+                tetrisgrid[current.y + j][current.x + i] = tetrodata[current.type].blockdata[offs];
             }
         }
     }
+    u8 nclear = checkLines(current.y, current.y + h);
+    if (nclear) {
+        addScore(scoretable[nclear] * level);
+        lines += nclear;
+        lineclearticks = 60;
+    } else {
+        nextTetromino();
+    }
     glueticks = 0;
     gravityticks = LEVEL_TICKS;
-    nextTetromino();
-    // TODO: check lines, add score
 }
 
 static void doHardDrop() {
+    u8 tmpy = current.y;
     while(!checkCollision(&current, current.x, current.y + 1)) {
         ++current.y;
     }
+    addScore((current.y - tmpy) * 2);
     doGlue();
 }
 
@@ -209,8 +277,9 @@ static void doGravity() {
     if (!checkCollision(&current, current.x, current.y + 1)) {
         ++current.y;
         gravityticks = LEVEL_TICKS;
+        addScore(softdrop); // +1 per row when soft dropping
     } else {
-        if ((++glueticks) >= LEVEL_TICKS) {
+        if ((++glueticks) >= LEVEL_TICKS/2) {
             doGlue();
         }
     }
@@ -247,54 +316,32 @@ static void doMove(int amt) {
     }
 }
 
-static void renderGrid() {
-    int i, j;
-    for (i = 0; i < 10; ++i) {
-        for (j = 0; j < 20; ++j) {
-            int x = GRID_XOFFSET + TETROMINO_SIZE * i;
-            int y = GRID_YOFFSET + TETROMINO_SIZE * j;
-            if (tetrisgrid[i][j + 2]) {
-                drawFillRect(x, y, x + TETROMINO_SIZE, y + TETROMINO_SIZE, tetrodata[tetrisgrid[i][j + 2] - 1].color);
-                drawRectangle(x, y, x + TETROMINO_SIZE, y + TETROMINO_SIZE, RGBA8_MAXALPHA(0,0,0));
-            } else {
-                drawFillRect(x + 1, y + 1, x + TETROMINO_SIZE, y + TETROMINO_SIZE, gridcolor);
-            }
+void doHold() {
+    if (!didswap) {
+        Tetromino t = onhold;
+        onhold.type = current.type;
+        if (t.ghost) {
+            onhold.ghost = 0;
+            nextTetromino();
+        } else {
+            current = t;
+            generateGhost(&current);
         }
+        didswap = 1;
     }
-}
-
-static void renderBlockData(int x, int y, u8 type, u8 rot, u8 ghost) {
-    u32 i, j, w, h, r, xx, yy, col;
-    w = tetrodata[type].width;
-    h = tetrodata[type].height;
-    r = rot * w;
-    for (i = 0; i < w; ++i) {
-        for (j = 0; j < h; ++j) {
-            if (tetrodata[type].blockdata[j * w * 4 + r + i]) {
-                xx = x + i * TETROMINO_SIZE;
-                yy = y + j * TETROMINO_SIZE;
-                col = ghost ? (tetrodata[type].color & 0x7FFFFFFF) : tetrodata[type].color;
-                drawFillRect(xx, yy, xx + TETROMINO_SIZE, yy + TETROMINO_SIZE, col);
-                drawRectangle(xx, yy, xx + TETROMINO_SIZE, yy + TETROMINO_SIZE, RGBA8_MAXALPHA(0,0,0));
-            }
-        }
-    }
-}
-
-static void renderTetromino(Tetromino* t) {
-    u32 x, y;
-    x = GRID_XOFFSET + (t->x * TETROMINO_SIZE);
-    y = GRID_YOFFSET + ((t->y - 2) * TETROMINO_SIZE);
-    renderBlockData(x, y, t->type, t->rot, t->ghost);
 }
 
 void tetrisInit() {
+    drawClearScreen(BG_COLOR);
     lines = score = 0;
     memset(tetrisgrid, 0, sizeof(tetrisgrid));
-    gridcolor = RGBA8_MAXALPHA(0xC0, 0xC0, 0xC0);
+    memset(linefull, 0, sizeof(linefull));
     currentbagpos = 0;
     level = 1;
+    pause = gameover = 0;
     gravityticks = LEVEL_TICKS;
+    didswap = 0;
+    onhold.ghost = 1;
     generateBag(currentbag);
     nextTetromino();
 }
@@ -303,22 +350,42 @@ void update() {
     u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
     u64 kHeld = hidKeysHeld(CONTROLLER_P1_AUTO);
 
-    // Quit the game (TODO: pause + select to quit)
+    // Screenshot
+    if (kDown & KEY_ZL) {
+        saveScreenshot("screenshot.png");
+    }
+    // Pause the game
     if (kDown & KEY_PLUS) {
-        running = 0;
-        return;
+        pause ^= 1;
+        if (gameover) {
+            tetrisInit();
+        }
     }
     // Switch between dark and light grid
     if (kDown & KEY_X) {
         gridcolor ^= 0xE0E0E0;
     }
 
-    // Wait for line clear animation to end
-    if (lineclearticks > 0) {
-        --lineclearticks;
+    if (pause) {
+        // Quit the game
+        if (kDown & KEY_MINUS) {
+            running = 0;
+        }
         return;
     }
 
+    // Wait for line clear animation to end
+    if (lineclearticks > 0) {
+        if ((--lineclearticks) == 0) {
+            clearLines();
+        }
+        return;
+    }
+
+    // Hold
+    if (kDown & (KEY_L | KEY_R)) {
+        doHold();
+    }
     // Rotate
     if (kDown & KEY_A) {
         doRotate(1);
@@ -331,24 +398,102 @@ void update() {
     } else if (kDown & KEY_LEFT) {
         doMove(-1);
     }
-    // Soft drop
-    if (kHeld & KEY_DOWN) {
-        gravityticks -= LEVEL_TICKS / 2;
-    }
     // Hard drop
     if (kDown & KEY_UP) {
         doHardDrop();
     }
 
-    if ((--gravityticks) <= 0) {
+    // Soft drop and gravity
+    softdrop = ((kHeld & KEY_DOWN) > 0);
+    gravityticks -= 1 + ((LEVEL_TICKS / 2) * softdrop);
+    if (gravityticks <= 0) {
         doGravity();
     }
+}
+
+static void renderGrid() {
+    int i, j;
+    for (j = 0; j < 20; ++j) {
+        int y = GRID_YOFFSET + TETROMINO_SIZE * j;
+        if (((lineclearticks & 7) < 4) && linefull[j + 2]) {
+            drawFillRect(GRID_XOFFSET, y, GRID_XOFFSET + 360, y + TETROMINO_SIZE, RGBA8_MAXALPHA(randomGet64()&0xFF,randomGet64()&0xFF,randomGet64()&0xFF));
+        } else for (i = 0; i < 10; ++i) {
+            int x = GRID_XOFFSET + TETROMINO_SIZE * i;
+            if (tetrisgrid[j + 2][i]) {
+                drawFillRect(x, y, x + TETROMINO_SIZE, y + TETROMINO_SIZE, tetrodata[tetrisgrid[j + 2][i] - 1].color);
+                drawRectangle(x, y, x + TETROMINO_SIZE, y + TETROMINO_SIZE, RGBA8_MAXALPHA(0,0,0));
+            } else {
+                drawFillRect(x + (i > 0), y + 1, x + TETROMINO_SIZE, y + TETROMINO_SIZE, gridcolor);
+            }
+        }
+    }
+}
+
+static void renderBlockData(int x, int y, u8 type, u8 rot, u8 ghost) {
+    u32 i, j, w, h, r, xx, yy, outline;
+    w = tetrodata[type].width;
+    h = tetrodata[type].height;
+    r = rot * w;
+    for (i = 0; i < w; ++i) {
+        for (j = 0; j < h; ++j) {
+            if (tetrodata[type].blockdata[j * w * 4 + r + i]) {
+                xx = x + i * TETROMINO_SIZE;
+                yy = y + j * TETROMINO_SIZE;
+                if (ghost) {
+                    outline = tetrodata[type].color;
+                } else {
+                    drawFillRect(xx, yy, xx + TETROMINO_SIZE, yy + TETROMINO_SIZE, tetrodata[type].color);
+                    outline = RGBA8_MAXALPHA(0,0,0);
+                }
+                drawRectangle(xx, yy, xx + TETROMINO_SIZE, yy + TETROMINO_SIZE, outline);
+            }
+        }
+    }
+}
+
+static void renderTetromino(Tetromino* t) {
+    u32 x, y;
+    x = GRID_XOFFSET + (t->x * TETROMINO_SIZE);
+    y = GRID_YOFFSET + ((t->y - 2) * TETROMINO_SIZE);
+    renderBlockData(x, y, t->type, t->rot, t->ghost);
 }
 
 void render() {
     drawStart();
     renderGrid();
-    renderTetromino(&ghost);
-    renderTetromino(&current);
+    if (!lineclearticks) {
+        renderTetromino(&ghost);
+        renderTetromino(&current);
+    }
+
+    drawFillRect(GRID_XOFFSET + 400, 0, 1280, 40, BG_COLOR);
+    drawTextFormat(tahoma24, GRID_XOFFSET + 400, 0, TEXT_COLOR, "Score: %08u    Highscore: %08u", score, highscore);
+    drawFillRect(40, 0, GRID_XOFFSET - 1, 80, BG_COLOR);
+    drawTextFormat(tahoma24, 40, 0, TEXT_COLOR, "Level: %u\nLines: %u", level, lines);
+
+    drawText(tahoma24, 40, 80, TEXT_COLOR, "HOLD");
+    drawFillRect(40, 120, 40 + TETROMINO_SIZE*5, 120 + TETROMINO_SIZE*5, gridcolor);
+    if (!onhold.ghost) {
+        renderBlockData(40 + (TETROMINO_SIZE/2)*(5-tetrodata[onhold.type].width), 120 + (TETROMINO_SIZE/2)*(5-tetrodata[onhold.type].height), onhold.type, 0, 0);
+    }
+
+    drawText(tahoma24, GRID_XOFFSET + 400, 80, TEXT_COLOR, "NEXT");
+    u8 i;
+    for (i = 0; i < NEXT_COUNT; ++i) {
+        u32 x = GRID_XOFFSET + 400 + (TETROMINO_SIZE * 5 + 20) * i;
+        u32 y = 120;
+        drawFillRect(x, y, x + TETROMINO_SIZE*5, y + TETROMINO_SIZE*5, gridcolor);
+        u8 type = currentbag[(currentbagpos + i) % 14];
+        renderBlockData(x + (TETROMINO_SIZE/2)*(5-tetrodata[type].width), y + (TETROMINO_SIZE/2)*(5-tetrodata[type].height), type, 0, 0);
+    }
+
+    if (pause) {
+        drawFillRect(GRID_XOFFSET + 1, 320, GRID_XOFFSET + 360, 360, RGBA8_MAXALPHA(255,255,255));
+        if (gameover) {
+            drawText(tahoma24, GRID_XOFFSET + 90, 320, RGBA8_MAXALPHA(0,0,0), "GAME OVER");
+        } else {
+            drawText(tahoma24, GRID_XOFFSET + 132, 320, RGBA8_MAXALPHA(0,0,0), "PAUSE");
+        }
+    }
     drawEnd();
 }
