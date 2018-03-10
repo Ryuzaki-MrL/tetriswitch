@@ -11,6 +11,7 @@
 
 #include "tetris.h"
 #include "switchdefs.h"
+#include "font.h"
 
 void gfxFlushBuffers() {}
 void gfxSwapBuffers() {}
@@ -23,6 +24,8 @@ u64 randomGet64() {
 u32 pixels[720 * 1280];
 
 int running = 1;
+
+ffnt_header_t* tahoma24;
 
 u8* gfxGetFramebuffer(u32* width, u32* height) {
     *width = 1280;
@@ -49,10 +52,7 @@ int main()
     sf::RenderWindow window(sf::VideoMode(1280, 720), "Test");
     window.setFramerateLimit(60);
 
-    // Clear the screen with a dark blue color
-    for (int i = 0; i < 720 * 1280; ++i) {
-        pixels[i] = 0xFF4F0000;
-    }
+    LoadFont(&tahoma24, "data/tahoma24.nxfnt");
 
     while (window.isOpen() && running)
     {

@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdarg.h>
 #ifdef SWITCH
     #include <switch.h>
 #else
@@ -5,6 +7,7 @@
 #endif
 
 #include "draw.h"
+#include "lodepng.h"
 
 static u32* framebuf;
 static u32 fbwidth;
@@ -18,6 +21,20 @@ void drawEnd() {
     gfxFlushBuffers();
     gfxSwapBuffers();
     gfxWaitForVsync();
+}
+
+void drawClearScreen(u32 color) {
+    int i;
+    drawStart();
+    for (i = 0; i < fbwidth * fbheight; ++i) {
+        framebuf[i] = color;
+    }
+    drawEnd();
+    drawStart();
+    for (i = 0; i < fbwidth * fbheight; ++i) {
+        framebuf[i] = color;
+    }
+    drawEnd();
 }
 
 void drawPixel(int x, int y, u32 color) {
@@ -80,4 +97,23 @@ void drawBitmap(int x, int y, Bitmap bmp) {
             }
         }
     }
+}
+
+void drawText(const ffnt_header_t* font, int x, int y, u32 color, const char* str) {
+    color_t clr;
+    clr.abgr = color;
+    DrawText(font, x, y, clr, str);
+}
+
+void drawTextFormat(const ffnt_header_t* font, int x, int y, u32 color, const char* str, ...) {
+    char buffer[256];
+    va_list valist;
+    va_start(valist, str);
+    vsnprintf(buffer, 255, str, valist);
+    drawText(font, x, y, color, buffer);
+    va_end(valist);
+}
+
+void saveScreenshot(const char* fname) {
+    lodepng_encode32_file(fname, (u8*)framebuf, fbwidth, fbheight);
 }
