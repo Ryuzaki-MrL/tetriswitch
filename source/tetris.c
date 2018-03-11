@@ -18,8 +18,8 @@
 #define TEXT_COLOR      RGBA8_MAXALPHA(255,255,255)
 #define BG_COLOR        RGBA8_MAXALPHA(0,0,0x4F)
 
-#define DEFAULT_TICKS   50
-#define LEVEL_TICKS     (DEFAULT_TICKS - (5 * level))
+#define DEFAULT_TICKS   54
+#define LEVEL_TICKS     ((level < 11) ? (DEFAULT_TICKS - (4 * level)) : 10)
 
 enum {
     TETRO_I, TETRO_J, TETRO_L, TETRO_O,
@@ -157,7 +157,6 @@ static int checkCollision(Tetromino* t, s8 x, s8 y) {
 
 static int checkLines(u8 start, u8 end) {
     u8 i, j, ln = 0;
-    printf("%u %u\n", start, end);
     for (j = start; j < end && j < 22; ++j) {
         for (i = 0; i < 10; ++i) {
             if (!tetrisgrid[j][i]) break;
@@ -172,6 +171,9 @@ static int checkLines(u8 start, u8 end) {
 
 static void addScore(int value) {
     score += value;
+    if (score > 99999999) {
+        score = 99999999;
+    }
     if (score > highscore) {
         highscore = score;
     }
@@ -279,7 +281,7 @@ static void doGravity() {
         gravityticks = LEVEL_TICKS;
         addScore(softdrop); // +1 per row when soft dropping
     } else {
-        if ((++glueticks) >= LEVEL_TICKS/2) {
+        if ((++glueticks) >= DEFAULT_TICKS/2) {
             doGlue();
         }
     }
@@ -351,7 +353,7 @@ void update() {
     u64 kHeld = hidKeysHeld(CONTROLLER_P1_AUTO);
 
     // Screenshot
-    if (kDown & KEY_ZL) {
+    if (kDown & (KEY_ZL | KEY_ZR)) {
         saveScreenshot("screenshot.png");
     }
     // Pause the game
@@ -416,7 +418,7 @@ static void renderGrid() {
     for (j = 0; j < 20; ++j) {
         int y = GRID_YOFFSET + TETROMINO_SIZE * j;
         if (((lineclearticks & 7) < 4) && linefull[j + 2]) {
-            drawFillRect(GRID_XOFFSET, y, GRID_XOFFSET + 360, y + TETROMINO_SIZE, RGBA8_MAXALPHA(randomGet64()&0xFF,randomGet64()&0xFF,randomGet64()&0xFF));
+            drawFillRect(GRID_XOFFSET, y, GRID_XOFFSET + 360, y + TETROMINO_SIZE, gridcolor);
         } else for (i = 0; i < 10; ++i) {
             int x = GRID_XOFFSET + TETROMINO_SIZE * i;
             if (tetrisgrid[j + 2][i]) {
