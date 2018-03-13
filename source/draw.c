@@ -33,16 +33,12 @@ void drawPixel(int x, int y, u32 color) {
 void drawLine(int x1, int y1, int x2, int y2, u32 color) {
     int x, y;
     if (x1 == x2) {
-        if (y1 < y2) {
-            for (y = y1; y <= y2; y++) drawPixel(x1, y, color);
-        } else {
-            for (y = y2; y <= y1; y++) drawPixel(x1, y, color);
+        for (y = y1; y <= y2; ++y) {
+            drawPixel(x1, y, color);
         }
     } else {
-        if (x1 < x2) {
-            for (x = x1; x <= x2; x++) drawPixel(x, y1, color);
-        } else {
-            for (x = x2; x <= x1; x++) drawPixel(x, y1, color);
+        for (x = x1; x <= x2; ++x) {
+            drawPixel(x, y1, color);
         }
     }
 }
@@ -55,19 +51,9 @@ void drawRectangle(int x1, int y1, int x2, int y2, u32 color) {
 }
 
 void drawFillRect(int x1, int y1, int x2, int y2, u32 color) {
-    int X1, X2, Y1, Y2, i, j;
-    if (x1 < x2) {
-        X1 = x1; X2 = x2;
-    } else {
-        X1 = x2; X2 = x1;
-    }
-    if (y1 < y2) {
-        Y1 = y1; Y2 = y2;
-    } else {
-        Y1 = y2; Y2 = y1;
-    }
-    for (i = X1; i <= X2; i++) {
-        for (j = Y1; j <= Y2; j++) {
+    int i, j;
+    for (i = x1; i <= x2; ++i) {
+        for (j = y1; j <= y2; ++j) {
             drawPixel(i, j, color);
         }
     }
