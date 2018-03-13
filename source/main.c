@@ -11,14 +11,14 @@ int main() {
     tetrisInit();
 
     while(appletMainLoop() && running) {
-		hidScanInput();
-		update();
+        hidScanInput();
+        update();
 
         render();
 
-		gfxFlushBuffers();
-		gfxSwapBuffers();
-		gfxWaitForVsync();
+        gfxFlushBuffers();
+        gfxSwapBuffers();
+        gfxWaitForVsync();
     }
 
     gfxExit();
