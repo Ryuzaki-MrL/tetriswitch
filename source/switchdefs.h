@@ -66,8 +66,5 @@ u64 hidKeysDown(int n);
 u64 hidKeysHeld(int n);
 
 u8* gfxGetFramebuffer(u32* width, u32* height);
-void gfxFlushBuffers();
-void gfxSwapBuffers();
-void gfxWaitForVsync();
 
 #endif /* SWITCHDEFS_H */

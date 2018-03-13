@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "font.h"
 #include "draw.h"
 
 static inline const ffnt_page_t* FontGetPage(const ffnt_header_t* font, uint32_t page_id)

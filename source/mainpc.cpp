@@ -5,17 +5,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define TICKS_PER_SECOND 60
-#define SKIP_TICKS (CLOCKS_PER_SEC / TICKS_PER_SECOND)
-#define MAX_FRAMESKIP 5
-
 #include "tetris.h"
 #include "switchdefs.h"
 #include "font.h"
-
-void gfxFlushBuffers() {}
-void gfxSwapBuffers() {}
-void gfxWaitForVsync() {}
 
 u64 randomGet64() {
     return rand();

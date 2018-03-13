@@ -497,5 +497,4 @@ void render() {
             drawText(tahoma24, GRID_XOFFSET + 132, 320, RGBA8_MAXALPHA(0,0,0), "PAUSE");
         }
     }
-    drawEnd();
 }

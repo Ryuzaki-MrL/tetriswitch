@@ -7,7 +7,6 @@
 #endif
 
 #include "draw.h"
-#include "lodepng.h"
 
 static u32* framebuf;
 static u32 fbwidth;
@@ -17,24 +16,11 @@ void drawStart() {
     framebuf = (u32*)gfxGetFramebuffer(&fbwidth, &fbheight);
 }
 
-void drawEnd() {
-    gfxFlushBuffers();
-    gfxSwapBuffers();
-    gfxWaitForVsync();
-}
-
 void drawClearScreen(u32 color) {
-    int i;
-    drawStart();
+	int i;
     for (i = 0; i < fbwidth * fbheight; ++i) {
         framebuf[i] = color;
     }
-    drawEnd();
-    drawStart();
-    for (i = 0; i < fbwidth * fbheight; ++i) {
-        framebuf[i] = color;
-    }
-    drawEnd();
 }
 
 void drawPixel(int x, int y, u32 color) {
@@ -112,8 +98,4 @@ void drawTextFormat(const ffnt_header_t* font, int x, int y, u32 color, const ch
     vsnprintf(buffer, 255, str, valist);
     drawText(font, x, y, color, buffer);
     va_end(valist);
-}
-
-void saveScreenshot(const char* fname) {
-    lodepng_encode32_file(fname, (u8*)framebuf, fbwidth, fbheight);
 }
