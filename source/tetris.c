@@ -18,8 +18,10 @@
 #define TEXT_COLOR      RGBA8_MAXALPHA(255,255,255)
 #define BG_COLOR        RGBA8_MAXALPHA(0,0,0x4F)
 
-#define DEFAULT_TICKS   54
-#define LEVEL_TICKS     ((level < 11) ? (DEFAULT_TICKS - (4 * level)) : 10)
+#define GRAVITY_TICKS   54
+#define LEVEL_TICKS     ((level < 11) ? (GRAVITY_TICKS - (4 * level)) : 10)
+#define LINECLEARTICKS  30
+#define GLUE_TICKS      (GRAVITY_TICKS >> 1)
 
 enum {
     TETRO_I, TETRO_J, TETRO_L, TETRO_O,
@@ -260,7 +262,7 @@ static void doGlue() {
     if (nclear) {
         addScore(scoretable[nclear] * level);
         lines += nclear;
-        lineclearticks = 60;
+        lineclearticks = LINECLEARTICKS;
     } else {
         nextTetromino();
     }
@@ -283,7 +285,7 @@ static void doGravity() {
         gravityticks = LEVEL_TICKS;
         addScore(softdrop); // +1 per row when soft dropping
     } else {
-        if ((++glueticks) >= DEFAULT_TICKS/2) {
+        if ((++glueticks) >= GLUE_TICKS) {
             doGlue();
         }
     }
