@@ -24,6 +24,8 @@
 #define LINECLEARTICKS  30
 #define GLUE_TICKS      (GRAVITY_TICKS >> 1)
 
+#define MAX_SCORE       99999999
+
 enum {
     TETRO_I, TETRO_J, TETRO_L, TETRO_O,
     TETRO_S, TETRO_T, TETRO_Z
@@ -151,6 +153,9 @@ static void saveHighscore() {
 static void loadHighscore() {
     FILE* f = fopen("highscore.bin", "rb");
     fread(&highscore, sizeof(highscore), 1, f);
+    if (highscore > MAX_SCORE) {
+        highscore = MAX_SCORE;
+    }
     fclose(f);
 }
 
@@ -187,8 +192,8 @@ static int checkLines(u8 start, u8 end) {
 
 static void addScore(int value) {
     score += value;
-    if (score > 99999999) {
-        score = 99999999;
+    if (score > MAX_SCORE) {
+        score = MAX_SCORE;
     }
     if (score > highscore) {
         highscore = score;
