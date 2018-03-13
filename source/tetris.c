@@ -1,8 +1,9 @@
+#include <stdio.h>
 #include <string.h>
+
 #ifdef SWITCH
     #include <switch.h>
 #else
-    #include <stdio.h>
     #include "switchdefs.h"
 #endif
 
@@ -141,6 +142,18 @@ static const int scoretable[] = {
     0, 100, 300, 500, 800
 };
 
+static void saveHighscore() {
+    FILE* f = fopen("highscore.bin", "wb");
+    fwrite(&highscore, sizeof(highscore), 1, f);
+    fclose(f);
+}
+
+static void loadHighscore() {
+    FILE* f = fopen("highscore.bin", "rb");
+    fread(&highscore, sizeof(highscore), 1, f);
+    fclose(f);
+}
+
 static int checkCollision(Tetromino* t, s8 x, s8 y) {
     u32 i, j, w, h, r;
     w = tetrodata[t->type].width;
@@ -184,7 +197,7 @@ static void addScore(int value) {
 
 static void doGameOver() {
     pause = gameover = 1;
-    // TODO: save highscore
+    saveHighscore();
 }
 
 static void generateBag(u8* bag) {
@@ -339,6 +352,7 @@ void doHold() {
 
 void tetrisInit() {
     lines = score = 0;
+    loadHighscore();
     memset(tetrisgrid, 0, sizeof(tetrisgrid));
     memset(linefull, 0, sizeof(linefull));
     currentbagpos = 0;

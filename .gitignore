@@ -5,3 +5,5 @@ build
 *.nso
 *.pfs0
 *.exe
+*.bin
+*.zip
